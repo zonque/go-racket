@@ -2,6 +2,7 @@ package rotor
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -20,7 +21,6 @@ type Message struct {
 	Subject  Subject
 	Data     []byte
 	Interval time.Duration
-	lastSent time.Time
 }
 
 func (m *Message) Validate() error {
@@ -62,10 +62,6 @@ func ParseMessage(payload []byte) (*Message, error) {
 	}, nil
 }
 
-func (m *Message) NextTime() time.Time {
-	return m.lastSent.Add(m.Interval)
-}
-
 func (m *Message) Send(conn *ipv4.PacketConn, addr net.Addr) error {
 	p := [][]byte{
 		[]byte(m.Group + "\\0"),
@@ -79,7 +75,26 @@ func (m *Message) Send(conn *ipv4.PacketConn, addr net.Addr) error {
 		return err
 	}
 
-	m.lastSent = time.Now()
-
 	return nil
+}
+
+func (m *Message) PeriodicSend(ctx context.Context, conn *ipv4.PacketConn, addr net.Addr) {
+	ticker := time.NewTicker(m.Interval)
+	defer ticker.Stop()
+
+	// Send the message immediately
+	if err := m.Send(conn, addr); err != nil {
+		fmt.Printf("Error sending message: %v\n", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := m.Send(conn, addr); err != nil {
+				fmt.Printf("Error sending message: %v\n", err)
+			}
+		}
+	}
 }

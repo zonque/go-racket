@@ -1,14 +1,31 @@
 package rotor
 
 import (
+	"crypto/sha512"
 	"fmt"
 	"sync"
 )
 
 type Callback func(*Message)
 
+type SubscriptionOpt interface {
+	apply(*Subscription)
+}
+
+type SubscriptionOptOnlyOnChange struct{}
+
+func SubscriptionOnlyOnChange() SubscriptionOpt {
+	return &SubscriptionOptOnlyOnChange{}
+}
+
+func (s *SubscriptionOptOnlyOnChange) apply(sub *Subscription) {
+	sub.onlyOnChange = true
+}
+
 type Subscription struct {
-	cb Callback
+	cb           Callback
+	onlyOnChange bool
+	contentHash  map[string]string
 }
 
 type subscriptionNode struct {
@@ -37,11 +54,11 @@ func (sn *subscriptionNode) removeSubscription(sub *Subscription) {
 }
 
 type SubscriptionTree struct {
-	mutex sync.RWMutex
+	mutex sync.Mutex
 	root  *subscriptionNode
 }
 
-func (st *SubscriptionTree) Add(subject Subject, callback Callback) *Subscription {
+func (st *SubscriptionTree) Add(subject Subject, callback Callback, opts ...SubscriptionOpt) *Subscription {
 	st.mutex.Lock()
 	defer st.mutex.Unlock()
 
@@ -58,7 +75,14 @@ func (st *SubscriptionTree) Add(subject Subject, callback Callback) *Subscriptio
 		node = node.children[part]
 	}
 
-	sub := Subscription{cb: callback}
+	sub := Subscription{
+		cb:          callback,
+		contentHash: make(map[string]string),
+	}
+
+	for _, opt := range opts {
+		opt.apply(&sub)
+	}
 
 	node.subscriptions = append(node.subscriptions, &sub)
 
@@ -73,12 +97,28 @@ func (st *SubscriptionTree) Remove(sub *Subscription) {
 }
 
 func (st *SubscriptionTree) Call(msg *Message) {
-	st.mutex.RLock()
-	defer st.mutex.RUnlock()
+	st.mutex.Lock()
+	defer st.mutex.Unlock()
+
+	var hash string
 
 	node := st.root
 	for _, part := range msg.Subject.Parts {
 		for _, sub := range node.subscriptions {
+			if len(hash) == 0 {
+				h := sha512.New()
+				h.Write([]byte(msg.Data))
+				hash = string(h.Sum(nil))
+			}
+
+			if sub.onlyOnChange && sub.contentHash[msg.Subject.String()] == hash {
+				continue
+			}
+
+			// fmt.Printf("Subject: %s, Hash: %s, OnlyOnChange %t\n", msg.Subject.String(), hash, sub.onlyOnChange)
+
+			sub.contentHash[msg.Subject.String()] = hash
+
 			sub.cb(msg)
 		}
 
@@ -91,8 +131,8 @@ func (st *SubscriptionTree) Call(msg *Message) {
 }
 
 func (st *SubscriptionTree) Dump() string {
-	st.mutex.RLock()
-	defer st.mutex.RUnlock()
+	st.mutex.Lock()
+	defer st.mutex.Unlock()
 
 	var dump string
 	var dumpNode func(node *subscriptionNode, level int)

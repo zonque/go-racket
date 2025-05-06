@@ -1,8 +1,8 @@
 package rotor
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -12,50 +12,96 @@ import (
 )
 
 type Sender struct {
-	lock      sync.RWMutex
-	messages  map[string]*Message
-	triggerCh chan struct{}
-	pool      *MulticastPool
-	pc        *ipv4.PacketConn
+	lock         sync.RWMutex
+	pool         *MulticastPool
+	senderGroups map[Group]*senderGroup
+}
+
+type queuedMessage struct {
+	msg    *Message
+	cancel context.CancelFunc
+}
+
+type senderGroup struct {
+	lock     sync.RWMutex
+	sendLock sync.Mutex
+	pool     *MulticastPool
+	pc       *ipv4.PacketConn
+	messages map[string]*queuedMessage
+}
+
+func newSenderGroup(pool *MulticastPool) (*senderGroup, error) {
+	pc, err := multicast.OpenPacketConn(net.IP{127, 0, 0, 1}, 19090, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &senderGroup{
+		pc:       pc,
+		pool:     pool,
+		messages: make(map[string]*queuedMessage),
+	}, nil
+}
+
+func (sg *senderGroup) send(m *Message, addr *net.UDPAddr) error {
+	sg.sendLock.Lock()
+	defer sg.sendLock.Unlock()
+
+	if err := m.Send(sg.pc, addr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (sg *senderGroup) publish(m *Message) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	sg.lock.Lock()
+
+	if qm, ok := sg.messages[m.Subject.String()]; ok {
+		qm.cancel()
+	}
+
+	sg.messages[m.Subject.String()] = &queuedMessage{
+		msg:    m,
+		cancel: cancel,
+	}
+
+	sg.lock.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(m.Interval)
+		defer ticker.Stop()
+
+		addr := sg.pool.AddressForGroup(m.Group)
+
+		// Send the message immediately
+		if err := sg.send(m, addr); err != nil {
+			fmt.Printf("Error sending message: %v\n", err)
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := sg.send(m, addr); err != nil {
+					fmt.Printf("Error sending message: %v\n", err)
+				}
+			}
+		}
+	}()
 }
 
 func NewSender(pool *MulticastPool) *Sender {
-	pc, err := multicast.OpenPacketConn(net.IP{127, 0, 0, 1}, 19090, "")
-	if err != nil {
-		panic(err)
-	}
-
 	return &Sender{
-		messages:  make(map[string]*Message),
-		triggerCh: make(chan struct{}),
-		pool:      pool,
-		pc:        pc,
+		senderGroups: make(map[Group]*senderGroup),
+		pool:         pool,
 	}
 }
 
-func (s *Sender) nextMessage() *Message {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	// Iterate over all the messages and find the one that should be sent
-	// next based on the interval and last sent time.
-	var next *Message
-
-	for _, m := range s.messages {
-		if next == nil {
-			next = m
-			continue
-		}
-
-		if m.NextTime().Before(next.NextTime()) {
-			next = m
-		}
-	}
-
-	return next
-}
-
-func (s *Sender) SendMessage(m *Message) error {
+func (s *Sender) Publish(m *Message) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -64,44 +110,23 @@ func (s *Sender) SendMessage(m *Message) error {
 		return fmt.Errorf("wildcard in subject not allowed")
 	}
 
-	addr := s.pool.AddressForGroup(m.Group)
-
-	log.Printf("Sending message to %v: %s", addr, m.Data)
-
-	if err := m.Send(s.pc, addr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Sender) Run() {
-	for {
-		next := s.nextMessage()
-		if next == nil {
-			<-s.triggerCh
-
-			continue
-		}
-
-		log.Printf("Next message to send at %v, now is %v", next.lastSent, time.Now())
-
-		select {
-		case <-s.triggerCh:
-		case <-time.After(time.Until(next.NextTime())):
-			if err := s.SendMessage(next); err != nil {
-				log.Printf("Error sending message: %v", err)
-			}
-		}
-	}
-}
-
-func (s *Sender) Publish(m *Message) error {
 	s.lock.Lock()
-	s.messages[m.Subject.String()] = m
-	s.lock.Unlock()
+	sg := s.senderGroups[m.Group]
+	if sg == nil {
+		var err error
 
-	s.triggerCh <- struct{}{}
+		sg, err = newSenderGroup(s.pool)
+		if err != nil {
+			s.lock.Unlock()
+			return err
+		}
+
+		s.senderGroups[m.Group] = sg
+	}
+
+	sg.publish(m)
+
+	defer s.lock.Unlock()
 
 	return nil
 }
@@ -110,5 +135,9 @@ func (s *Sender) Flush() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.messages = make(map[string]*Message)
+	// for _, qm := range s.messages {
+	// 	qm.cancel()
+	// }
+
+	// s.messages = make(map[string]*queuedMessage)
 }

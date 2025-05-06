@@ -35,7 +35,7 @@ func (r *Receiver) rawReceive(payload []byte) {
 	group.subscriptionTree.Call(msg)
 }
 
-func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback) (*Subscription, error) {
+func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback, opts ...SubscriptionOpt) (*Subscription, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -57,7 +57,7 @@ func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback) (*Subscr
 		r.groups[group] = g
 	}
 
-	sub := g.subscriptionTree.Add(subject, cb)
+	sub := g.subscriptionTree.Add(subject, cb, opts...)
 
 	return sub, nil
 }

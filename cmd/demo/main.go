@@ -1,11 +1,24 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"math/rand/v2"
 	"net"
 	"time"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
 )
+
+func randomBytes(size int) []byte {
+	b := make([]byte, size)
+
+	for i := 0; i < size; i++ {
+		b[i] = byte(rand.IntN(256))
+	}
+
+	return b
+}
 
 func main() {
 	base := net.IPNet{
@@ -15,45 +28,34 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	g1 := rotor.Group("group-1")
-
-	s1 := rotor.Subject{
-		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
-	}
-
-	s2 := rotor.Subject{
-		Parts: []string{"org", "holoplot", "go", "rotor", "blah"},
-	}
-
-	a := multicastPool.AddressForGroup(g1)
-	println(a.String())
-
 	sender := rotor.NewSender(multicastPool)
 
-	go sender.Run()
+	n := 0
 
-	msg := &rotor.Message{
-		Subject:  s1,
-		Group:    g1,
-		Data:     []byte("Hello, world!"),
-		Interval: time.Second,
+	for groupIndex := range 256 {
+		for subjectIndex := range 1024 {
+			g := rotor.Group(fmt.Sprintf("group-%d", groupIndex))
+			s := rotor.Subject{
+				Parts: []string{"org", "holoplot", fmt.Sprintf("rotor-%d", subjectIndex)},
+			}
+
+			msg := &rotor.Message{
+				Group:    g,
+				Subject:  s,
+				Data:     randomBytes(128),
+				Interval: time.Millisecond*time.Duration(rand.IntN(1000)) + time.Second,
+			}
+
+			if err := sender.Publish(msg); err != nil {
+				panic(err)
+			}
+
+			n++
+		}
 	}
 
-	msg2 := &rotor.Message{
-		Subject:  s2,
-		Group:    g1,
-		Data:     []byte("fck ths sht!"),
-		Interval: time.Second / 2,
-	}
+	log.Printf("Published %d messages\n", n)
 
-	if err := sender.Publish(msg); err != nil {
-		panic(err)
-	}
-
-	if err := sender.Publish(msg2); err != nil {
-		panic(err)
-	}
-
-	time.Sleep(10 * time.Second)
+	time.Sleep(time.Minute)
 	sender.Flush()
 }

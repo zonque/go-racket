@@ -21,8 +21,6 @@ func main() {
 
 	sender := rotor.NewSender(multicastPool)
 
-	go sender.Run()
-
 	msg := &rotor.Message{
 		Subject:  s,
 		Data:     []byte("Hello, world!"),
