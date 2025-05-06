@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 )
 
 func main() {
@@ -15,13 +17,20 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	s := rotor.Subject{
+	lo, err := net.InterfaceByName("lo")
+	if err != nil {
+		panic(err)
+	}
+
+	ifis := []*net.Interface{lo}
+
+	s := subject.Subject{
 		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
 	}
 
-	sender := rotor.NewSender(multicastPool)
+	sender := rotor.NewSender(ifis, multicastPool)
 
-	msg := &rotor.Message{
+	msg := &message.Message{
 		Subject:  s,
 		Data:     []byte("Hello, world!"),
 		Interval: time.Second,

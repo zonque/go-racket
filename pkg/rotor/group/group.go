@@ -1,3 +1,3 @@
-package rotor
+package group
 
 type Group string

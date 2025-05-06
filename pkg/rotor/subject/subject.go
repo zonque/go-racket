@@ -1,4 +1,4 @@
-package rotor
+package subject
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ var (
 	ErrWildcardNotLast   = errors.New("wildcard not at the end of subject")
 )
 
-func ParseSubject(subject string) (Subject, error) {
+func Parse(subject string) (Subject, error) {
 	parts := strings.Split(subject, ".")
 
 	for i, part := range parts {

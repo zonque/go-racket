@@ -1,24 +1,27 @@
-package rotor
+package subscription
 
 import (
 	"crypto/sha512"
 	"fmt"
 	"sync"
+
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 )
 
-type Callback func(*Message)
+type Callback func(*message.Message)
 
-type SubscriptionOpt interface {
+type Opt interface {
 	apply(*Subscription)
 }
 
-type SubscriptionOptOnlyOnChange struct{}
+type OptOnlyOnChange struct{}
 
-func SubscriptionOnlyOnChange() SubscriptionOpt {
-	return &SubscriptionOptOnlyOnChange{}
+func OnlyOnChange() Opt {
+	return &OptOnlyOnChange{}
 }
 
-func (s *SubscriptionOptOnlyOnChange) apply(sub *Subscription) {
+func (s *OptOnlyOnChange) apply(sub *Subscription) {
 	sub.onlyOnChange = true
 }
 
@@ -28,19 +31,19 @@ type Subscription struct {
 	contentHash  map[string]string
 }
 
-type subscriptionNode struct {
+type node struct {
 	subscriptions []*Subscription
-	children      map[string]*subscriptionNode
+	children      map[string]*node
 }
 
-func newSubscriptionNode() *subscriptionNode {
-	return &subscriptionNode{
+func newNode() *node {
+	return &node{
 		subscriptions: make([]*Subscription, 0),
-		children:      make(map[string]*subscriptionNode),
+		children:      make(map[string]*node),
 	}
 }
 
-func (sn *subscriptionNode) removeSubscription(sub *Subscription) {
+func (sn *node) removeSubscription(sub *Subscription) {
 	for i, s := range sn.subscriptions {
 		if s == sub {
 			sn.subscriptions = append(sn.subscriptions[:i], sn.subscriptions[i+1:]...)
@@ -53,23 +56,23 @@ func (sn *subscriptionNode) removeSubscription(sub *Subscription) {
 	}
 }
 
-type SubscriptionTree struct {
+type Tree struct {
 	mutex sync.Mutex
-	root  *subscriptionNode
+	root  *node
 }
 
-func (st *SubscriptionTree) Add(subject Subject, callback Callback, opts ...SubscriptionOpt) *Subscription {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+func (t *Tree) Add(subject subject.Subject, callback Callback, opts ...Opt) *Subscription {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	node := st.root
+	node := t.root
 	for _, part := range subject.Parts {
 		if part == "*" {
 			break
 		}
 
 		if _, ok := node.children[part]; !ok {
-			node.children[part] = newSubscriptionNode()
+			node.children[part] = newNode()
 		}
 
 		node = node.children[part]
@@ -89,20 +92,20 @@ func (st *SubscriptionTree) Add(subject Subject, callback Callback, opts ...Subs
 	return &sub
 }
 
-func (st *SubscriptionTree) Remove(sub *Subscription) {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+func (t *Tree) Remove(sub *Subscription) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	st.root.removeSubscription(sub)
+	t.root.removeSubscription(sub)
 }
 
-func (st *SubscriptionTree) Call(msg *Message) {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
+func (t *Tree) Dispatch(msg *message.Message) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
 	var hash string
 
-	node := st.root
+	node := t.root
 	for _, part := range msg.Subject.Parts {
 		for _, sub := range node.subscriptions {
 			if len(hash) == 0 {
@@ -130,14 +133,14 @@ func (st *SubscriptionTree) Call(msg *Message) {
 	}
 }
 
-func (st *SubscriptionTree) Dump() string {
+func (st *Tree) Dump() string {
 	st.mutex.Lock()
 	defer st.mutex.Unlock()
 
 	var dump string
-	var dumpNode func(node *subscriptionNode, level int)
+	var dumpNode func(node *node, level int)
 
-	dumpNode = func(node *subscriptionNode, level int) {
+	dumpNode = func(node *node, level int) {
 		prefix := make([]byte, level)
 		for i := range prefix {
 			prefix[i] = ' '
@@ -156,8 +159,8 @@ func (st *SubscriptionTree) Dump() string {
 	return dump
 }
 
-func NewSubscriptionTree() *SubscriptionTree {
-	return &SubscriptionTree{
-		root: newSubscriptionNode(),
+func NewTree() *Tree {
+	return &Tree{
+		root: newNode(),
 	}
 }

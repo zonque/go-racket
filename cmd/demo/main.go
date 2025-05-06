@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
+	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 )
 
 func randomBytes(size int) []byte {
@@ -28,18 +31,31 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	sender := rotor.NewSender(multicastPool)
+	lo, err := net.InterfaceByName("lo")
+	if err != nil {
+		panic(err)
+	}
+
+	eth, err := net.InterfaceByName("enp0s31f6")
+	if err != nil {
+		panic(err)
+	}
+
+	ifis := []*net.Interface{lo, eth}
+
+	sender := rotor.NewSender(ifis, multicastPool)
 
 	n := 0
 
 	for groupIndex := range 256 {
+		g := group.Group(fmt.Sprintf("group-%d", groupIndex))
+
 		for subjectIndex := range 1024 {
-			g := rotor.Group(fmt.Sprintf("group-%d", groupIndex))
-			s := rotor.Subject{
+			s := subject.Subject{
 				Parts: []string{"org", "holoplot", fmt.Sprintf("rotor-%d", subjectIndex)},
 			}
 
-			msg := &rotor.Message{
+			msg := &message.Message{
 				Group:    g,
 				Subject:  s,
 				Data:     randomBytes(128),

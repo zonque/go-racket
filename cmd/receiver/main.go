@@ -6,6 +6,10 @@ import (
 	"net"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
+	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
+	"github.com/holoplot/go-rotor/pkg/rotor/subscription"
 )
 
 func main() {
@@ -16,9 +20,9 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	g1 := rotor.Group("group-1")
+	g1 := group.Group("group-1")
 
-	s1 := rotor.Subject{
+	s1 := subject.Subject{
 		Parts: []string{"org", "holoplot", "*"},
 	}
 
@@ -27,12 +31,18 @@ func main() {
 		panic(err)
 	}
 
-	ifis := []*net.Interface{lo}
+	eth, err := net.InterfaceByName("enp0s31f6")
+	if err != nil {
+		panic(err)
+	}
+
+	ifis := []*net.Interface{lo, eth}
 
 	receiver := rotor.NewReceiver(ifis, multicastPool)
-	if _, err := receiver.Subscribe(g1, s1, func(msg *rotor.Message) {
+
+	if _, err := receiver.Subscribe(g1, s1, func(msg *message.Message) {
 		fmt.Printf("Received message on subject %s (%d bytes)\n", msg.Subject.String(), len(msg.Data))
-	}, rotor.SubscriptionOnlyOnChange()); err != nil {
+	}, subscription.OnlyOnChange()); err != nil {
 		panic(err)
 	}
 

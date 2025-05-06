@@ -5,24 +5,27 @@ import (
 	"sync"
 
 	"github.com/holoplot/go-rotor/pkg/multicast"
+	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
+	"github.com/holoplot/go-rotor/pkg/rotor/subscription"
 )
 
 type Receiver struct {
 	mutex sync.Mutex
 
-	groups map[Group]receiverGroup
-
+	groups        map[group.Group]receiverGroup
 	MulticastPool *MulticastPool
 	dispatcher    *multicast.Dispatcher
 }
 
 type receiverGroup struct {
 	consumer         *multicast.Consumer
-	subscriptionTree *SubscriptionTree
+	subscriptionTree *subscription.Tree
 }
 
 func (r *Receiver) rawReceive(payload []byte) {
-	msg, err := ParseMessage(payload)
+	msg, err := message.Parse(payload)
 	if err != nil {
 		panic(err)
 	}
@@ -32,10 +35,10 @@ func (r *Receiver) rawReceive(payload []byte) {
 		panic("group not found")
 	}
 
-	group.subscriptionTree.Call(msg)
+	group.subscriptionTree.Dispatch(msg)
 }
 
-func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback, opts ...SubscriptionOpt) (*Subscription, error) {
+func (r *Receiver) Subscribe(group group.Group, subject subject.Subject, cb subscription.Callback, opts ...subscription.Opt) (*subscription.Subscription, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -44,7 +47,7 @@ func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback, opts ...
 	g, ok := r.groups[group]
 	if !ok {
 		g = receiverGroup{
-			subscriptionTree: NewSubscriptionTree(),
+			subscriptionTree: subscription.NewTree(),
 		}
 
 		var err error
@@ -62,7 +65,7 @@ func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback, opts ...
 	return sub, nil
 }
 
-func (r *Receiver) Unsubscribe(group Group, sub *Subscription) error {
+func (r *Receiver) Unsubscribe(group group.Group, sub *subscription.Subscription) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -86,12 +89,12 @@ func (r *Receiver) Close() {
 
 	r.dispatcher.Close()
 
-	r.groups = make(map[Group]receiverGroup)
+	r.groups = make(map[group.Group]receiverGroup)
 }
 
 func NewReceiver(ifis []*net.Interface, pool *MulticastPool) *Receiver {
 	return &Receiver{
-		groups:        make(map[Group]receiverGroup),
+		groups:        make(map[group.Group]receiverGroup),
 		dispatcher:    multicast.NewDispatcher(ifis),
 		MulticastPool: pool,
 	}

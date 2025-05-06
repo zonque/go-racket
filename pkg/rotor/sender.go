@@ -8,17 +8,21 @@ import (
 	"time"
 
 	"github.com/holoplot/go-rotor/pkg/multicast"
+	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/message"
 	"golang.org/x/net/ipv4"
 )
 
 type Sender struct {
-	lock         sync.RWMutex
+	lock sync.RWMutex
+
+	ifis         []*net.Interface
 	pool         *MulticastPool
-	senderGroups map[Group]*senderGroup
+	senderGroups map[group.Group]*senderGroup
 }
 
 type queuedMessage struct {
-	msg    *Message
+	msg    *message.Message
 	cancel context.CancelFunc
 }
 
@@ -26,35 +30,37 @@ type senderGroup struct {
 	lock     sync.RWMutex
 	sendLock sync.Mutex
 	pool     *MulticastPool
-	pc       *ipv4.PacketConn
+	pcs      []*ipv4.PacketConn
 	messages map[string]*queuedMessage
 }
 
-func newSenderGroup(pool *MulticastPool) (*senderGroup, error) {
-	pc, err := multicast.OpenPacketConn(net.IP{127, 0, 0, 1}, 19090, "")
+func newSenderGroup(ifis []*net.Interface, pool *MulticastPool) (*senderGroup, error) {
+	pcs, err := multicast.OpenPacketConns(ifis, defaultPort)
 	if err != nil {
 		return nil, err
 	}
 
 	return &senderGroup{
-		pc:       pc,
+		pcs:      pcs,
 		pool:     pool,
 		messages: make(map[string]*queuedMessage),
 	}, nil
 }
 
-func (sg *senderGroup) send(m *Message, addr *net.UDPAddr) error {
+func (sg *senderGroup) send(m *message.Message, addr *net.UDPAddr) error {
 	sg.sendLock.Lock()
 	defer sg.sendLock.Unlock()
 
-	if err := m.Send(sg.pc, addr); err != nil {
-		return err
+	for _, pc := range sg.pcs {
+		if err := m.Send(pc, addr); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (sg *senderGroup) publish(m *Message) {
+func (sg *senderGroup) publish(m *message.Message) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sg.lock.Lock()
@@ -94,14 +100,30 @@ func (sg *senderGroup) publish(m *Message) {
 	}()
 }
 
-func NewSender(pool *MulticastPool) *Sender {
+func (sg *senderGroup) flush() {
+	sg.lock.Lock()
+	defer sg.lock.Unlock()
+
+	for _, qm := range sg.messages {
+		qm.cancel()
+	}
+
+	for _, pc := range sg.pcs {
+		pc.Close()
+	}
+
+	sg.messages = make(map[string]*queuedMessage)
+}
+
+func NewSender(ifis []*net.Interface, pool *MulticastPool) *Sender {
 	return &Sender{
-		senderGroups: make(map[Group]*senderGroup),
+		senderGroups: make(map[group.Group]*senderGroup),
+		ifis:         ifis,
 		pool:         pool,
 	}
 }
 
-func (s *Sender) Publish(m *Message) error {
+func (s *Sender) Publish(m *message.Message) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -115,7 +137,7 @@ func (s *Sender) Publish(m *Message) error {
 	if sg == nil {
 		var err error
 
-		sg, err = newSenderGroup(s.pool)
+		sg, err = newSenderGroup(s.ifis, s.pool)
 		if err != nil {
 			s.lock.Unlock()
 			return err
@@ -135,9 +157,9 @@ func (s *Sender) Flush() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// for _, qm := range s.messages {
-	// 	qm.cancel()
-	// }
+	for _, sg := range s.senderGroups {
+		sg.flush()
+	}
 
-	// s.messages = make(map[string]*queuedMessage)
+	s.senderGroups = make(map[group.Group]*senderGroup)
 }

@@ -44,3 +44,29 @@ func OpenPacketConn(bindAddr net.IP, port int, ifname string) (*ipv4.PacketConn,
 
 	return p, nil
 }
+
+func OpenPacketConns(ifis []*net.Interface, port int) ([]*ipv4.PacketConn, error) {
+	var pcs []*ipv4.PacketConn
+
+	for _, ifi := range ifis {
+		addrs, err := ifi.Addrs()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+				bindAddr := ipnet.IP.To4()
+
+				p, err := OpenPacketConn(bindAddr, port, ifi.Name)
+				if err != nil {
+					return nil, err
+				}
+
+				pcs = append(pcs, p)
+			}
+		}
+	}
+
+	return pcs, nil
+}

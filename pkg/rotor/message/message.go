@@ -1,4 +1,4 @@
-package rotor
+package message
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 	"golang.org/x/net/ipv4"
 )
 
@@ -17,8 +19,8 @@ var (
 )
 
 type Message struct {
-	Group    Group
-	Subject  Subject
+	Group    group.Group
+	Subject  subject.Subject
 	Data     []byte
 	Interval time.Duration
 }
@@ -35,15 +37,15 @@ func (m *Message) Validate() error {
 	return nil
 }
 
-func ParseMessage(payload []byte) (*Message, error) {
+func Parse(payload []byte) (*Message, error) {
 	parts := bytes.SplitN(payload, []byte("\\0"), 3)
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid message format")
 	}
 
-	group := Group(parts[0])
+	group := group.Group(parts[0])
 
-	subject, err := ParseSubject(string(parts[1]))
+	subject, err := subject.Parse(string(parts[1]))
 	if err != nil {
 		return nil, err
 	}
