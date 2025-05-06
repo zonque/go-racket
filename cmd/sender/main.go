@@ -16,8 +16,7 @@ func main() {
 	multicastPool := rotor.NewMulticastPool(base)
 
 	s := rotor.Subject{
-		Parts:      []string{"org", "holoplot", "go", "rotor", "demo"},
-		GroupDepth: 3,
+		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
 	}
 
 	sender := rotor.NewSender(multicastPool)

@@ -10,18 +10,16 @@ import (
 type Receiver struct {
 	mutex sync.Mutex
 
-	subscriptions map[string]subscription
+	groups map[Group]receiverGroup
 
 	MulticastPool *MulticastPool
 	dispatcher    *multicast.Dispatcher
 }
 
-type subscription struct {
-	cb       Callback
-	consumer *multicast.Consumer
+type receiverGroup struct {
+	consumer         *multicast.Consumer
+	subscriptionTree *SubscriptionTree
 }
-
-type Callback func(*Message)
 
 func (r *Receiver) rawReceive(payload []byte) {
 	msg, err := ParseMessage(payload)
@@ -29,47 +27,51 @@ func (r *Receiver) rawReceive(payload []byte) {
 		panic(err)
 	}
 
-	sub, ok := r.subscriptions[msg.Subject.String()]
+	group, ok := r.groups[msg.Group]
 	if !ok {
-		return
+		panic("group not found")
 	}
 
-	sub.cb(msg)
+	group.subscriptionTree.Call(msg)
 }
 
-func (r *Receiver) Subscribe(subject Subject, cb Callback) error {
+func (r *Receiver) Subscribe(group Group, subject Subject, cb Callback) (*Subscription, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	addr := r.MulticastPool.AddressForSubject(subject)
+	addr := r.MulticastPool.AddressForGroup(group)
 
-	consumer, err := r.dispatcher.AddConsumer(addr, r.rawReceive)
-	if err != nil {
-		return err
+	g, ok := r.groups[group]
+	if !ok {
+		g = receiverGroup{
+			subscriptionTree: NewSubscriptionTree(),
+		}
+
+		var err error
+
+		g.consumer, err = r.dispatcher.AddConsumer(addr, r.rawReceive)
+		if err != nil {
+			return nil, err
+		}
+
+		r.groups[group] = g
 	}
 
-	sub := subscription{
-		cb:       cb,
-		consumer: consumer,
-	}
+	sub := g.subscriptionTree.Add(subject, cb)
 
-	r.subscriptions[subject.String()] = sub
-
-	return nil
+	return sub, nil
 }
 
-func (r *Receiver) Unsubscribe(subject Subject) error {
+func (r *Receiver) Unsubscribe(group Group, sub *Subscription) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	sub, ok := r.subscriptions[subject.String()]
+	g, ok := r.groups[group]
 	if !ok {
 		return nil
 	}
 
-	sub.consumer.Close()
-
-	delete(r.subscriptions, subject.String())
+	g.subscriptionTree.Remove(sub)
 
 	return nil
 }
@@ -78,18 +80,18 @@ func (r *Receiver) Close() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	for _, sub := range r.subscriptions {
-		sub.consumer.Close()
+	for _, g := range r.groups {
+		g.consumer.Close()
 	}
 
 	r.dispatcher.Close()
 
-	r.subscriptions = make(map[string]subscription)
+	r.groups = make(map[Group]receiverGroup)
 }
 
 func NewReceiver(ifis []*net.Interface, pool *MulticastPool) *Receiver {
 	return &Receiver{
-		subscriptions: make(map[string]subscription),
+		groups:        make(map[Group]receiverGroup),
 		dispatcher:    multicast.NewDispatcher(ifis),
 		MulticastPool: pool,
 	}

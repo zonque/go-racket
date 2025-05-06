@@ -3,9 +3,6 @@ package rotor
 import (
 	"crypto/sha256"
 	"net"
-	"strings"
-
-	"golang.org/x/net/ipv4"
 )
 
 const (
@@ -13,24 +10,17 @@ const (
 )
 
 type MulticastPool struct {
-	base      net.IPNet
-	receivers map[string]*ipv4.PacketConn
-	// senders   map[string]*net.UDPConn
-	senders map[string]*ipv4.PacketConn
+	base net.IPNet
 }
 
 func NewMulticastPool(base net.IPNet) *MulticastPool {
 	return &MulticastPool{
-		base:      base,
-		receivers: make(map[string]*ipv4.PacketConn),
-		// senders:   make(map[string]*net.UDPConn),
-		senders: make(map[string]*ipv4.PacketConn),
+		base: base,
 	}
 }
 
-func (m *MulticastPool) AddressForSubject(subject Subject) *net.UDPAddr {
-	s := strings.Join(subject.Parts[:subject.GroupDepth], ".")
-	h := sha256.Sum256([]byte(s))
+func (m *MulticastPool) AddressForGroup(group Group) *net.UDPAddr {
+	h := sha256.Sum256([]byte(group))
 
 	a := [4]byte{m.base.IP[12], m.base.IP[13], m.base.IP[14], m.base.IP[15]}
 

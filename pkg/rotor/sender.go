@@ -1,6 +1,7 @@
 package rotor
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -55,7 +56,15 @@ func (s *Sender) nextMessage() *Message {
 }
 
 func (s *Sender) SendMessage(m *Message) error {
-	addr := s.pool.AddressForSubject(m.Subject)
+	if err := m.Validate(); err != nil {
+		return err
+	}
+
+	if m.Subject.HasWildcard() {
+		return fmt.Errorf("wildcard in subject not allowed")
+	}
+
+	addr := s.pool.AddressForGroup(m.Group)
 
 	log.Printf("Sending message to %v: %s", addr, m.Data)
 
@@ -80,7 +89,9 @@ func (s *Sender) Run() {
 		select {
 		case <-s.triggerCh:
 		case <-time.After(time.Until(next.NextTime())):
-			s.SendMessage(next)
+			if err := s.SendMessage(next); err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
 		}
 	}
 }

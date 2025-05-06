@@ -15,17 +15,17 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	s := rotor.Subject{
-		Parts:      []string{"org", "holoplot", "go", "rotor", "demo"},
-		GroupDepth: 3,
+	g1 := rotor.Group("group-1")
+
+	s1 := rotor.Subject{
+		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
 	}
 
 	s2 := rotor.Subject{
-		Parts:      []string{"org", "holoplot", "go", "rotor", "blah"},
-		GroupDepth: 3,
+		Parts: []string{"org", "holoplot", "go", "rotor", "blah"},
 	}
 
-	a := multicastPool.AddressForSubject(s)
+	a := multicastPool.AddressForGroup(g1)
 	println(a.String())
 
 	sender := rotor.NewSender(multicastPool)
@@ -33,13 +33,15 @@ func main() {
 	go sender.Run()
 
 	msg := &rotor.Message{
-		Subject:  s,
+		Subject:  s1,
+		Group:    g1,
 		Data:     []byte("Hello, world!"),
 		Interval: time.Second,
 	}
 
 	msg2 := &rotor.Message{
 		Subject:  s2,
+		Group:    g1,
 		Data:     []byte("fck ths sht!"),
 		Interval: time.Second / 2,
 	}

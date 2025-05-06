@@ -16,9 +16,10 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
+	g1 := rotor.Group("group-1")
+
 	s1 := rotor.Subject{
-		Parts:      []string{"org", "holoplot", "go", "rotor", "demo"},
-		GroupDepth: 3,
+		Parts: []string{"org", "holoplot", "go", "*"},
 	}
 
 	lo, err := net.InterfaceByName("lo")
@@ -29,7 +30,7 @@ func main() {
 	ifis := []*net.Interface{lo}
 
 	receiver := rotor.NewReceiver(ifis, multicastPool)
-	if err := receiver.Subscribe(s1, func(msg *rotor.Message) {
+	if _, err := receiver.Subscribe(g1, s1, func(msg *rotor.Message) {
 		fmt.Printf("Received message on subject %s: >%s<\n", msg.Subject.String(), string(msg.Data))
 	}); err != nil {
 		panic(err)

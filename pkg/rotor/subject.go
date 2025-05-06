@@ -1,35 +1,37 @@
 package rotor
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 type Subject struct {
-	Parts      []string
-	GroupDepth int
+	Parts []string
 }
 
-func ParseSubject(subject string) Subject {
+var (
+	ErrMultipleWildcards = errors.New("multiple wildcards in subject")
+	ErrWildcardNotLast   = errors.New("wildcard not at the end of subject")
+)
+
+func ParseSubject(subject string) (Subject, error) {
 	parts := strings.Split(subject, ".")
-	groupDepth := 0
 
 	for i, part := range parts {
 		if part == "*" {
-			groupDepth = i
-			break
+			if i != len(parts)-1 {
+				return Subject{}, ErrWildcardNotLast
+			}
 		}
 	}
 
 	return Subject{
-		Parts:      parts,
-		GroupDepth: groupDepth,
-	}
+		Parts: parts,
+	}, nil
 }
 
-func (s Subject) Group() string {
-	if s.GroupDepth == 0 {
-		return ""
-	}
-
-	return strings.Join(s.Parts[:s.GroupDepth], ".")
+func (s Subject) HasWildcard() bool {
+	return s.Parts[len(s.Parts)-1] == "*"
 }
 
 func (s Subject) String() string {
