@@ -27,14 +27,17 @@ func randomBytes(size int) []byte {
 
 func main() {
 	_, base, _ := net.ParseCIDR("239.0.0.0/16")
-	multicastPool := multicastpool.New(*base)
+	multicastPool, err := multicastpool.New(*base)
+	if err != nil {
+		panic(err)
+	}
 
 	lo, err := net.InterfaceByName("lo")
 	if err != nil {
 		panic(err)
 	}
 
-	eth, err := net.InterfaceByName("wlp0s20f3")
+	eth, err := net.InterfaceByName("enp0s31f6")
 	if err != nil {
 		panic(err)
 	}
@@ -49,17 +52,17 @@ func main() {
 	n := 0
 
 	for streamIndex := range 256 {
-		g := stream.Stream(fmt.Sprintf("stream-%d", streamIndex))
+		st := stream.Stream(fmt.Sprintf("stream-%d", streamIndex))
 
 		for subjectIndex := range 1024 {
-			s := subject.Subject{
-				Parts: []string{"org", "holoplot", fmt.Sprintf("racket-%d", subjectIndex)},
+			su := subject.Subject{
+				Parts: []string{"org", "foo", fmt.Sprintf("racket-%d", subjectIndex)},
 			}
 
 			msg := &message.Message{
-				Stream:   g,
-				Subject:  s,
-				Data:     randomBytes(128),
+				Stream:   st,
+				Subject:  su,
+				Data:     randomBytes(128 + rand.IntN(256)),
 				Interval: time.Millisecond*time.Duration(rand.IntN(1000)) + time.Second,
 			}
 

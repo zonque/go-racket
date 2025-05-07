@@ -2,20 +2,29 @@ package multicastpool
 
 import (
 	"crypto/sha256"
+	"errors"
 	"net"
 
 	"github.com/holoplot/go-racket/pkg/racket/global"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 )
 
+var (
+	ErrInvalidAddress = errors.New("invalid address")
+)
+
 type Pool struct {
 	base net.IPNet
 }
 
-func New(base net.IPNet) *Pool {
+func New(base net.IPNet) (*Pool, error) {
+	if !base.IP.IsMulticast() {
+		return nil, ErrInvalidAddress
+	}
+
 	return &Pool{
 		base: base,
-	}
+	}, nil
 }
 
 func (m *Pool) AddressForStream(stream stream.Stream) *net.UDPAddr {

@@ -16,12 +16,14 @@ import (
 
 func main() {
 	_, base, _ := net.ParseCIDR("239.0.0.0/16")
-	multicastPool := multicastpool.New(*base)
+	multicastPool, err := multicastpool.New(*base)
+	if err != nil {
+		panic(err)
+	}
 
-	g1 := stream.Stream("stream-1")
-
-	s1 := subject.Subject{
-		Parts: []string{"org", "holoplot", "*"},
+	st := stream.Stream("stream-1")
+	su := subject.Subject{
+		Parts: []string{"org", "foo", "*"},
 	}
 
 	lo, err := net.InterfaceByName("lo")
@@ -38,8 +40,8 @@ func main() {
 
 	receiver := racket.New(ifis, multicastPool)
 
-	if _, err := receiver.Subscribe(g1, s1, func(msg *message.Message) {
-		fmt.Printf("Received message on subject %s (%d bytes)\n", msg.Subject.String(), len(msg.Data))
+	if _, err := receiver.Subscribe(st, su, func(msg *message.Message) {
+		fmt.Printf("Received message on subject %s (%d bytes)\n", msg.Subject, len(msg.Data))
 	}, subscription.OnlyOnChange()); err != nil {
 		panic(err)
 	}

@@ -8,14 +8,14 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	_, ipNet, err := net.ParseCIDR("192.168.1.0/24")
+	_, ipNet, err := net.ParseCIDR("224.0.0.255/24")
 	if err != nil {
 		t.Fatalf("failed to parse CIDR: %v", err)
 	}
 
-	pool := New(*ipNet)
-	if pool == nil {
-		t.Fatal("expected pool to be created, got nil")
+	pool, err := New(*ipNet)
+	if err != nil {
+		t.Fatalf("failed to create pool: %v", err)
 	}
 
 	if pool.base.String() != ipNet.String() {
@@ -44,9 +44,9 @@ func TestPool_AddressForStream(t *testing.T) {
 				t.Fatalf("failed to parse CIDR: %v", err)
 			}
 
-			pool := New(*ipNet)
-			if pool == nil {
-				t.Fatal("expected pool to be created, got nil")
+			pool, err := New(*ipNet)
+			if err != nil {
+				t.Fatalf("failed to create pool: %v", err)
 			}
 
 			if got := pool.AddressForStream(tt.stream); got.IP.String() != tt.want {
