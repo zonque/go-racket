@@ -98,15 +98,16 @@ func (sg *senderStream) publish(m *message.Message) {
 	sg.lock.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(m.Interval)
-		defer ticker.Stop()
-
 		addr := sg.pool.AddressForStream(m.Stream)
 
 		// Send the message immediately
 		if err := sg.send(m, addr); err != nil {
 			fmt.Printf("Error sending message: %v\n", err)
+			return
 		}
+
+		ticker := time.NewTicker(m.Interval)
+		defer ticker.Stop()
 
 		for {
 			select {
