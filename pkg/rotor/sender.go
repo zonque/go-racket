@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	addressmonitor "github.com/holoplot/go-rotor/pkg/address-monitor"
 	"github.com/holoplot/go-rotor/pkg/multicast"
 	"github.com/holoplot/go-rotor/pkg/rotor/message"
 	"github.com/holoplot/go-rotor/pkg/rotor/stream"
@@ -42,14 +41,14 @@ func newSenderStream(ifis []*net.Interface, pool *MulticastPool) (*senderStream,
 		messages: make(map[string]*queuedMessage),
 	}
 
-	if err := sg.reopenPacketConns(); err != nil {
+	if err := sg.reopenPacketConns(ifis); err != nil {
 		return nil, err
 	}
 
 	return sg, nil
 }
 
-func (sg *senderStream) reopenPacketConns() error {
+func (sg *senderStream) reopenPacketConns(ifis []*net.Interface) error {
 	sg.lock.Lock()
 	defer sg.lock.Unlock()
 
@@ -59,7 +58,7 @@ func (sg *senderStream) reopenPacketConns() error {
 		}
 	}
 
-	pcs, err := multicast.OpenPacketConns(nil, defaultPort)
+	pcs, err := multicast.OpenPacketConns(ifis, defaultPort)
 	if err != nil {
 		return err
 	}
@@ -142,28 +141,6 @@ func NewSender(ifis []*net.Interface, pool *MulticastPool) (*Sender, error) {
 		senderStreams: make(map[stream.Stream]*senderStream),
 		ifis:          ifis,
 		pool:          pool,
-	}
-
-	// Monitor the interfaces for changes and reopen packet conns if needed
-	for _, ifi := range ifis {
-		monitor, err := addressmonitor.New(context.Background(), ifi.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		go func() {
-			for range <-monitor.Ch {
-				sender.lock.Lock()
-
-				for _, sg := range sender.senderStreams {
-					if err := sg.reopenPacketConns(); err != nil {
-						fmt.Printf("Error reopening packet conns: %v\n", err)
-					}
-				}
-
-				sender.lock.Unlock()
-			}
-		}()
 	}
 
 	return sender, nil

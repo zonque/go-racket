@@ -91,7 +91,7 @@ func (l *listener) hasConsumers() bool {
 }
 
 func newListener(port int, ifis []*net.Interface) (*listener, error) {
-	pc, err := OpenPacketConn(net.IPv4(0, 0, 0, 0), port, "")
+	pc, err := OpenPacketConn(port, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open packet conn: %w", err)
 	}

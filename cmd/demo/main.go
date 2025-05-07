@@ -36,7 +36,7 @@ func main() {
 		panic(err)
 	}
 
-	eth, err := net.InterfaceByName("enp0s31f6")
+	eth, err := net.InterfaceByName("wlp0s20f3")
 	if err != nil {
 		panic(err)
 	}
