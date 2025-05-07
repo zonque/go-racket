@@ -24,14 +24,15 @@ func NewMulticastPool(base net.IPNet) *MulticastPool {
 func (m *MulticastPool) AddressForStream(stream stream.Stream) *net.UDPAddr {
 	h := sha256.Sum256([]byte(stream))
 
-	a := [4]byte{m.base.IP[12], m.base.IP[13], m.base.IP[14], m.base.IP[15]}
+	ip := make([]byte, 4)
+	copy(ip, m.base.IP.To4())
 
 	for i, mb := range m.base.Mask {
-		a[i] |= h[i] & ^mb
+		ip[i] |= h[i] & ^mb
 	}
 
 	udpAddr := &net.UDPAddr{
-		IP:   net.IP(a[:]),
+		IP:   ip,
 		Port: defaultPort,
 	}
 

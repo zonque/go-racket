@@ -34,6 +34,20 @@ type node struct {
 	children      map[string]*node
 }
 
+func (n *node) Dispatch(msg *message.Message) {
+	for _, sub := range n.subscriptions {
+		if sub.onlyOnChange {
+			if sub.contentHash[msg.Subject.String()] == msg.Hash() {
+				continue
+			}
+
+			sub.contentHash[msg.Subject.String()] = msg.Hash()
+		}
+
+		sub.cb(msg)
+	}
+}
+
 func newNode() *node {
 	return &node{
 		subscriptions: make([]*Subscription, 0),
@@ -80,18 +94,18 @@ func (t *Tree) Add(s subject.Subject, callback Callback, opts ...Opt) *Subscript
 		node = node.children[part]
 	}
 
-	sub := Subscription{
+	sub := &Subscription{
 		cb:          callback,
 		contentHash: make(map[string]string),
 	}
 
 	for _, opt := range opts {
-		opt.apply(&sub)
+		opt.apply(sub)
 	}
 
-	node.subscriptions = append(node.subscriptions, &sub)
+	node.subscriptions = append(node.subscriptions, sub)
 
-	return &sub
+	return sub
 }
 
 func (t *Tree) Remove(sub *Subscription) {
@@ -107,24 +121,18 @@ func (t *Tree) Dispatch(msg *message.Message) {
 
 	node := t.root
 	for _, part := range msg.Subject.Parts {
-		for _, sub := range node.subscriptions {
-			if sub.onlyOnChange {
-				if sub.contentHash[msg.Subject.String()] == msg.Hash() {
-					continue
-				}
-
-				sub.contentHash[msg.Subject.String()] = msg.Hash()
-			}
-
-			sub.cb(msg)
-		}
+		node.Dispatch(msg)
 
 		if child, ok := node.children[part]; ok {
 			node = child
 		} else {
+			// We have reached the end of the subject parts, and
+			// there are no more children to traverse.
 			return
 		}
 	}
+
+	node.Dispatch(msg)
 }
 
 func NewTree() *Tree {

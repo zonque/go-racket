@@ -13,12 +13,8 @@ import (
 )
 
 func main() {
-	base := net.IPNet{
-		IP:   net.ParseIP("239.0.0.0"),
-		Mask: net.CIDRMask(16, 32),
-	}
-
-	multicastPool := racket.NewMulticastPool(base)
+	_, base, _ := net.ParseCIDR("239.0.0.0/16")
+	multicastPool := racket.NewMulticastPool(*base)
 
 	g1 := stream.Stream("stream-1")
 

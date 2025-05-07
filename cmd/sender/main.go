@@ -1,48 +1,76 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"math/rand/v2"
 	"net"
 	"time"
 
 	"github.com/holoplot/go-racket/pkg/racket"
 	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"github.com/holoplot/go-racket/pkg/racket/subject"
 )
 
-func main() {
-	base := net.IPNet{
-		IP:   net.ParseIP("239.0.0.0"),
-		Mask: net.CIDRMask(16, 32),
+func randomBytes(size int) []byte {
+	b := make([]byte, size)
+
+	for i := 0; i < size; i++ {
+		b[i] = byte(rand.IntN(256))
 	}
 
-	multicastPool := racket.NewMulticastPool(base)
+	return b
+}
+
+func main() {
+	_, base, _ := net.ParseCIDR("239.0.0.0/16")
+	multicastPool := racket.NewMulticastPool(*base)
 
 	lo, err := net.InterfaceByName("lo")
 	if err != nil {
 		panic(err)
 	}
 
-	ifis := []*net.Interface{lo}
-
-	s := subject.Subject{
-		Parts: []string{"org", "holoplot", "go", "racket", "demo"},
+	eth, err := net.InterfaceByName("wlp0s20f3")
+	if err != nil {
+		panic(err)
 	}
+
+	ifis := []*net.Interface{lo, eth}
 
 	sender, err := racket.NewSender(ifis, multicastPool)
 	if err != nil {
 		panic(err)
 	}
 
-	msg := &message.Message{
-		Subject:  s,
-		Data:     []byte("Hello, world!"),
-		Interval: time.Second,
+	n := 0
+
+	for streamIndex := range 256 {
+		g := stream.Stream(fmt.Sprintf("stream-%d", streamIndex))
+
+		for subjectIndex := range 1024 {
+			s := subject.Subject{
+				Parts: []string{"org", "holoplot", fmt.Sprintf("racket-%d", subjectIndex)},
+			}
+
+			msg := &message.Message{
+				Stream:   g,
+				Subject:  s,
+				Data:     randomBytes(128),
+				Interval: time.Millisecond*time.Duration(rand.IntN(1000)) + time.Second,
+			}
+
+			if err := sender.Publish(msg); err != nil {
+				panic(err)
+			}
+
+			n++
+		}
 	}
 
-	if err := sender.Publish(msg); err != nil {
-		panic(err)
-	}
+	log.Printf("Published %d messages\n", n)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(time.Minute)
 	sender.Flush()
 }
