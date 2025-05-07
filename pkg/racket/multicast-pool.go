@@ -1,10 +1,10 @@
-package rotor
+package racket
 
 import (
 	"crypto/sha256"
 	"net"
 
-	"github.com/holoplot/go-rotor/pkg/rotor/stream"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
 )
 
 const (

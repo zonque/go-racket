@@ -1,14 +1,14 @@
-package rotor
+package racket
 
 import (
 	"net"
 	"sync"
 
-	"github.com/holoplot/go-rotor/pkg/multicast"
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/stream"
-	"github.com/holoplot/go-rotor/pkg/rotor/subject"
-	"github.com/holoplot/go-rotor/pkg/rotor/subscription"
+	"github.com/holoplot/go-racket/pkg/multicast"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
+	"github.com/holoplot/go-racket/pkg/racket/subject"
+	"github.com/holoplot/go-racket/pkg/racket/subscription"
 )
 
 type Receiver struct {

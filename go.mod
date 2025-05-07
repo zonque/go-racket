@@ -1,4 +1,4 @@
-module github.com/holoplot/go-rotor
+module github.com/holoplot/go-racket
 
 go 1.23.0
 

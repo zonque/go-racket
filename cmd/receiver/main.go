@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/holoplot/go-rotor/pkg/rotor"
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/stream"
-	"github.com/holoplot/go-rotor/pkg/rotor/subject"
-	"github.com/holoplot/go-rotor/pkg/rotor/subscription"
+	"github.com/holoplot/go-racket/pkg/racket"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
+	"github.com/holoplot/go-racket/pkg/racket/subject"
+	"github.com/holoplot/go-racket/pkg/racket/subscription"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 		Mask: net.CIDRMask(16, 32),
 	}
 
-	multicastPool := rotor.NewMulticastPool(base)
+	multicastPool := racket.NewMulticastPool(base)
 
 	g1 := stream.Stream("stream-1")
 
@@ -31,14 +31,14 @@ func main() {
 		panic(err)
 	}
 
-	eth, err := net.InterfaceByName("end0")
+	eth, err := net.InterfaceByName("enp0s31f6")
 	if err != nil {
 		panic(err)
 	}
 
 	ifis := []*net.Interface{lo, eth}
 
-	receiver := rotor.NewReceiver(ifis, multicastPool)
+	receiver := racket.NewReceiver(ifis, multicastPool)
 
 	if _, err := receiver.Subscribe(g1, s1, func(msg *message.Message) {
 		fmt.Printf("Received message on subject %s (%d bytes)\n", msg.Subject.String(), len(msg.Data))

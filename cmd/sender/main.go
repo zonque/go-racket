@@ -4,9 +4,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/holoplot/go-rotor/pkg/rotor"
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/subject"
+	"github.com/holoplot/go-racket/pkg/racket"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/subject"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 		Mask: net.CIDRMask(16, 32),
 	}
 
-	multicastPool := rotor.NewMulticastPool(base)
+	multicastPool := racket.NewMulticastPool(base)
 
 	lo, err := net.InterfaceByName("lo")
 	if err != nil {
@@ -25,10 +25,10 @@ func main() {
 	ifis := []*net.Interface{lo}
 
 	s := subject.Subject{
-		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
+		Parts: []string{"org", "holoplot", "go", "racket", "demo"},
 	}
 
-	sender, err := rotor.NewSender(ifis, multicastPool)
+	sender, err := racket.NewSender(ifis, multicastPool)
 	if err != nil {
 		panic(err)
 	}

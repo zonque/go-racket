@@ -1,11 +1,10 @@
 package subscription
 
 import (
-	"crypto/sha256"
 	"sync"
 
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/subject"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/subject"
 )
 
 type Callback func(*message.Message)
@@ -106,23 +105,15 @@ func (t *Tree) Dispatch(msg *message.Message) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	var hash string
-
 	node := t.root
 	for _, part := range msg.Subject.Parts {
 		for _, sub := range node.subscriptions {
 			if sub.onlyOnChange {
-				if len(hash) == 0 {
-					h := sha256.New()
-					h.Write([]byte(msg.Data))
-					hash = string(h.Sum(nil))
-				}
-
-				if sub.contentHash[msg.Subject.String()] == hash {
+				if sub.contentHash[msg.Subject.String()] == msg.Hash() {
 					continue
 				}
 
-				sub.contentHash[msg.Subject.String()] = hash
+				sub.contentHash[msg.Subject.String()] = msg.Hash()
 			}
 
 			sub.cb(msg)

@@ -1,4 +1,4 @@
-package rotor
+package racket
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/holoplot/go-rotor/pkg/multicast"
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/stream"
+	"github.com/holoplot/go-racket/pkg/multicast"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"golang.org/x/net/ipv4"
 )
 
@@ -114,6 +114,10 @@ func (sg *senderStream) publish(m *message.Message) {
 				return
 			case <-ticker.C:
 				if err := sg.send(m, addr); err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+
 					fmt.Printf("Error sending message: %v\n", err)
 				}
 			}

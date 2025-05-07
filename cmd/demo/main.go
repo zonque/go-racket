@@ -7,10 +7,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/holoplot/go-rotor/pkg/rotor"
-	"github.com/holoplot/go-rotor/pkg/rotor/message"
-	"github.com/holoplot/go-rotor/pkg/rotor/stream"
-	"github.com/holoplot/go-rotor/pkg/rotor/subject"
+	"github.com/holoplot/go-racket/pkg/racket"
+	"github.com/holoplot/go-racket/pkg/racket/message"
+	"github.com/holoplot/go-racket/pkg/racket/stream"
+	"github.com/holoplot/go-racket/pkg/racket/subject"
 )
 
 func randomBytes(size int) []byte {
@@ -29,7 +29,7 @@ func main() {
 		Mask: net.CIDRMask(16, 32),
 	}
 
-	multicastPool := rotor.NewMulticastPool(base)
+	multicastPool := racket.NewMulticastPool(base)
 
 	lo, err := net.InterfaceByName("lo")
 	if err != nil {
@@ -43,7 +43,7 @@ func main() {
 
 	ifis := []*net.Interface{lo, eth}
 
-	sender, err := rotor.NewSender(ifis, multicastPool)
+	sender, err := racket.NewSender(ifis, multicastPool)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func main() {
 
 		for subjectIndex := range 1024 {
 			s := subject.Subject{
-				Parts: []string{"org", "holoplot", fmt.Sprintf("rotor-%d", subjectIndex)},
+				Parts: []string{"org", "holoplot", fmt.Sprintf("racket-%d", subjectIndex)},
 			}
 
 			msg := &message.Message{
