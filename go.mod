@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.24.2
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/rs/zerolog v1.34.0
 	golang.org/x/net v0.39.0
 )

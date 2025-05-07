@@ -34,7 +34,9 @@ type node struct {
 	children      map[string]*node
 }
 
-func (n *node) Dispatch(msg *message.Message) {
+func (n *node) Dispatch(msg *message.Message) uint64 {
+	dispatched := uint64(0)
+
 	for _, sub := range n.subscriptions {
 		if sub.onlyOnChange {
 			if sub.contentHash[msg.Subject.String()] == msg.Hash() {
@@ -45,7 +47,30 @@ func (n *node) Dispatch(msg *message.Message) {
 		}
 
 		sub.cb(msg)
+		dispatched++
 	}
+
+	return dispatched
+}
+
+func (n *node) countChildren() int {
+	count := len(n.children)
+
+	for _, child := range n.children {
+		count += child.countChildren()
+	}
+
+	return count
+}
+
+func (n *node) countSubscriptions() int {
+	count := len(n.subscriptions)
+
+	for _, child := range n.children {
+		count += child.countSubscriptions()
+	}
+
+	return count
 }
 
 func newNode() *node {
@@ -115,28 +140,47 @@ func (t *Tree) Remove(sub *Subscription) {
 	t.root.removeSubscription(sub)
 }
 
-func (t *Tree) Dispatch(msg *message.Message) {
+func (t *Tree) Dispatch(msg *message.Message) uint64 {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
+	dispatched := uint64(0)
+
 	node := t.root
 	for _, part := range msg.Subject.Parts {
-		node.Dispatch(msg)
+		dispatched += node.Dispatch(msg)
 
 		if child, ok := node.children[part]; ok {
 			node = child
 		} else {
 			// We have reached the end of the subject parts, and
 			// there are no more children to traverse.
-			return
+			return dispatched
 		}
 	}
 
-	node.Dispatch(msg)
+	dispatched += node.Dispatch(msg)
+
+	return dispatched
 }
 
 func NewTree() *Tree {
 	return &Tree{
 		root: newNode(),
+	}
+}
+
+type Stats struct {
+	NodesCount         int `json:"nodes_count,omitempty"`
+	SubscriptionsCount int `json:"subscriptions_count,omitempty"`
+}
+
+func (t *Tree) Stats() Stats {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	return Stats{
+		NodesCount:         t.root.countChildren(),
+		SubscriptionsCount: t.root.countSubscriptions(),
 	}
 }

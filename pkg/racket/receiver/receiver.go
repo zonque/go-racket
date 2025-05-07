@@ -3,6 +3,7 @@ package racket
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/holoplot/go-racket/pkg/multicast"
 	"github.com/holoplot/go-racket/pkg/racket/message"
@@ -15,7 +16,7 @@ import (
 type Receiver struct {
 	mutex sync.Mutex
 
-	streams       map[stream.Stream]receiverStream
+	streams       map[stream.Stream]*receiverStream
 	MulticastPool *multicastpool.Pool
 	dispatcher    *multicast.Dispatcher
 }
@@ -23,6 +24,9 @@ type Receiver struct {
 type receiverStream struct {
 	consumer         *multicast.Consumer
 	subscriptionTree *subscription.Tree
+
+	messagesReceived   atomic.Uint64
+	messagesDispatched atomic.Uint64
 }
 
 func (r *Receiver) rawReceive(payload []byte) {
@@ -36,7 +40,9 @@ func (r *Receiver) rawReceive(payload []byte) {
 		panic("stream not found")
 	}
 
-	stream.subscriptionTree.Dispatch(msg)
+	d := stream.subscriptionTree.Dispatch(msg)
+	stream.messagesReceived.Add(1)
+	stream.messagesDispatched.Add(d)
 }
 
 func (r *Receiver) Subscribe(stream stream.Stream, subject subject.Subject, cb subscription.Callback, opts ...subscription.Opt) (*subscription.Subscription, error) {
@@ -45,23 +51,23 @@ func (r *Receiver) Subscribe(stream stream.Stream, subject subject.Subject, cb s
 
 	addr := r.MulticastPool.AddressForStream(stream)
 
-	g, ok := r.streams[stream]
+	rs, ok := r.streams[stream]
 	if !ok {
-		g = receiverStream{
+		rs = &receiverStream{
 			subscriptionTree: subscription.NewTree(),
 		}
 
 		var err error
 
-		g.consumer, err = r.dispatcher.AddConsumer(addr, r.rawReceive)
+		rs.consumer, err = r.dispatcher.AddConsumer(addr, r.rawReceive)
 		if err != nil {
 			return nil, err
 		}
 
-		r.streams[stream] = g
+		r.streams[stream] = rs
 	}
 
-	sub := g.subscriptionTree.Add(subject, cb, opts...)
+	sub := rs.subscriptionTree.Add(subject, cb, opts...)
 
 	return sub, nil
 }
@@ -90,13 +96,42 @@ func (r *Receiver) Close() {
 
 	r.dispatcher.Close()
 
-	r.streams = make(map[stream.Stream]receiverStream)
+	r.streams = make(map[stream.Stream]*receiverStream)
 }
 
 func New(ifis []*net.Interface, pool *multicastpool.Pool) *Receiver {
 	return &Receiver{
-		streams:       make(map[stream.Stream]receiverStream),
+		streams:       make(map[stream.Stream]*receiverStream),
 		dispatcher:    multicast.NewDispatcher(ifis),
 		MulticastPool: pool,
 	}
+}
+
+type StreamStats struct {
+	SubscriptionStats  subscription.Stats
+	MessagesReceived   uint64
+	MessagesDispatched uint64
+}
+
+type Stats struct {
+	Streams map[stream.Stream]StreamStats
+}
+
+func (r *Receiver) Stats() Stats {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	stats := Stats{
+		Streams: make(map[stream.Stream]StreamStats),
+	}
+
+	for stream, g := range r.streams {
+		stats.Streams[stream] = StreamStats{
+			SubscriptionStats:  g.subscriptionTree.Stats(),
+			MessagesReceived:   g.messagesReceived.Load(),
+			MessagesDispatched: g.messagesDispatched.Load(),
+		}
+	}
+
+	return stats
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/holoplot/go-racket/pkg/multicast"
@@ -34,6 +35,8 @@ type senderStream struct {
 	pool     *multicastpool.Pool
 	pcs      []*ipv4.PacketConn
 	messages map[string]*queuedMessage
+
+	messagesSent atomic.Uint64
 }
 
 func newSenderStream(ifis []*net.Interface, pool *multicastpool.Pool) (*senderStream, error) {
@@ -79,6 +82,8 @@ func (sg *senderStream) send(m *message.Message, addr *net.UDPAddr) error {
 			return err
 		}
 	}
+
+	sg.messagesSent.Add(1)
 
 	return nil
 }
@@ -193,4 +198,46 @@ func (s *Sender) Flush() {
 	}
 
 	s.senderStreams = make(map[stream.Stream]*senderStream)
+}
+
+type StreamStats struct {
+	QueuedMessages    int     `json:"queued_messages,omitempty"`
+	QueuedBytes       int     `json:"queued_bytes,omitempty"`
+	MessagesPerSecond float64 `json:"messages_per_second,omitempty"`
+	BytesPerSecond    float64 `json:"bytes_per_second,omitempty"`
+	MessagesSent      uint64  `json:"messages_sent,omitempty"`
+}
+
+type Stats struct {
+	Streams map[stream.Stream]StreamStats `json:"streams,omitempty"`
+}
+
+func (s *Sender) Stats() Stats {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	stats := Stats{
+		Streams: make(map[stream.Stream]StreamStats),
+	}
+
+	for stream, sg := range s.senderStreams {
+		streamStats := StreamStats{
+			MessagesSent: sg.messagesSent.Load(),
+		}
+
+		sg.lock.RLock()
+
+		for _, qm := range sg.messages {
+			streamStats.QueuedMessages++
+			streamStats.QueuedBytes += len(qm.msg.Data)
+			streamStats.MessagesPerSecond += qm.msg.Interval.Seconds()
+			streamStats.BytesPerSecond += float64(len(qm.msg.Data)) / qm.msg.Interval.Seconds()
+		}
+
+		sg.lock.RUnlock()
+
+		stats.Streams[stream] = streamStats
+	}
+
+	return stats
 }

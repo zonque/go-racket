@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/holoplot/go-racket/pkg/racket/message"
 	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
 	racket "github.com/holoplot/go-racket/pkg/racket/sender"
@@ -72,6 +73,12 @@ func main() {
 
 	log.Printf("Published %d messages\n", n)
 
-	time.Sleep(time.Minute)
+	for range 30 {
+		stats := sender.Stats()
+		spew.Dump("Sender stats\n", stats.Streams[stream.Stream("stream-1")])
+
+		time.Sleep(time.Second)
+	}
+
 	sender.Flush()
 }

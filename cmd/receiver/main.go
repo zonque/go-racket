@@ -1,10 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/holoplot/go-racket/pkg/racket/message"
 	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
 	racket "github.com/holoplot/go-racket/pkg/racket/receiver"
@@ -43,5 +44,10 @@ func main() {
 		panic(err)
 	}
 
-	<-context.Background().Done()
+	for {
+		stats := receiver.Stats()
+		spew.Dump(stats)
+
+		time.Sleep(time.Second)
+	}
 }
