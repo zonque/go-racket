@@ -189,6 +189,29 @@ func (s *Sender) Publish(m *message.Message) error {
 	return nil
 }
 
+func (s *Sender) Delete(m *message.Message) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	sg := s.senderStreams[m.Stream]
+	if sg == nil {
+		return fmt.Errorf("stream %s not found", m.Stream)
+	}
+
+	sg.lock.Lock()
+	defer sg.lock.Unlock()
+
+	qm, ok := sg.messages[m.Subject.String()]
+	if !ok {
+		return fmt.Errorf("message not found in stream %s", m.Stream)
+	}
+
+	qm.cancel()
+	delete(sg.messages, m.Subject.String())
+
+	return nil
+}
+
 func (s *Sender) Flush() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
