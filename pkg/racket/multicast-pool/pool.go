@@ -1,27 +1,24 @@
-package racket
+package multicastpool
 
 import (
 	"crypto/sha256"
 	"net"
 
+	"github.com/holoplot/go-racket/pkg/racket/global"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 )
 
-const (
-	defaultPort = 19090
-)
-
-type MulticastPool struct {
+type Pool struct {
 	base net.IPNet
 }
 
-func NewMulticastPool(base net.IPNet) *MulticastPool {
-	return &MulticastPool{
+func New(base net.IPNet) *Pool {
+	return &Pool{
 		base: base,
 	}
 }
 
-func (m *MulticastPool) AddressForStream(stream stream.Stream) *net.UDPAddr {
+func (m *Pool) AddressForStream(stream stream.Stream) *net.UDPAddr {
 	h := sha256.Sum256([]byte(stream))
 
 	ip := make([]byte, 4)
@@ -33,7 +30,7 @@ func (m *MulticastPool) AddressForStream(stream stream.Stream) *net.UDPAddr {
 
 	udpAddr := &net.UDPAddr{
 		IP:   ip,
-		Port: defaultPort,
+		Port: global.DefaultPort,
 	}
 
 	return udpAddr

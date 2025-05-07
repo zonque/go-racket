@@ -6,6 +6,7 @@ import (
 
 	"github.com/holoplot/go-racket/pkg/multicast"
 	"github.com/holoplot/go-racket/pkg/racket/message"
+	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"github.com/holoplot/go-racket/pkg/racket/subject"
 	"github.com/holoplot/go-racket/pkg/racket/subscription"
@@ -15,7 +16,7 @@ type Receiver struct {
 	mutex sync.Mutex
 
 	streams       map[stream.Stream]receiverStream
-	MulticastPool *MulticastPool
+	MulticastPool *multicastpool.Pool
 	dispatcher    *multicast.Dispatcher
 }
 
@@ -92,7 +93,7 @@ func (r *Receiver) Close() {
 	r.streams = make(map[stream.Stream]receiverStream)
 }
 
-func NewReceiver(ifis []*net.Interface, pool *MulticastPool) *Receiver {
+func New(ifis []*net.Interface, pool *multicastpool.Pool) *Receiver {
 	return &Receiver{
 		streams:       make(map[stream.Stream]receiverStream),
 		dispatcher:    multicast.NewDispatcher(ifis),

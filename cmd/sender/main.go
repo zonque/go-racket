@@ -7,8 +7,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/holoplot/go-racket/pkg/racket"
 	"github.com/holoplot/go-racket/pkg/racket/message"
+	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
+	racket "github.com/holoplot/go-racket/pkg/racket/sender"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"github.com/holoplot/go-racket/pkg/racket/subject"
 )
@@ -25,7 +26,7 @@ func randomBytes(size int) []byte {
 
 func main() {
 	_, base, _ := net.ParseCIDR("239.0.0.0/16")
-	multicastPool := racket.NewMulticastPool(*base)
+	multicastPool := multicastpool.New(*base)
 
 	lo, err := net.InterfaceByName("lo")
 	if err != nil {
@@ -39,7 +40,7 @@ func main() {
 
 	ifis := []*net.Interface{lo, eth}
 
-	sender, err := racket.NewSender(ifis, multicastPool)
+	sender, err := racket.New(ifis, multicastPool)
 	if err != nil {
 		panic(err)
 	}

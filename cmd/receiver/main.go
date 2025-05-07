@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/holoplot/go-racket/pkg/racket"
 	"github.com/holoplot/go-racket/pkg/racket/message"
+	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
+	racket "github.com/holoplot/go-racket/pkg/racket/receiver"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"github.com/holoplot/go-racket/pkg/racket/subject"
 	"github.com/holoplot/go-racket/pkg/racket/subscription"
@@ -14,7 +15,7 @@ import (
 
 func main() {
 	_, base, _ := net.ParseCIDR("239.0.0.0/16")
-	multicastPool := racket.NewMulticastPool(*base)
+	multicastPool := multicastpool.New(*base)
 
 	g1 := stream.Stream("stream-1")
 
@@ -34,7 +35,7 @@ func main() {
 
 	ifis := []*net.Interface{lo, eth}
 
-	receiver := racket.NewReceiver(ifis, multicastPool)
+	receiver := racket.New(ifis, multicastPool)
 
 	if _, err := receiver.Subscribe(g1, s1, func(msg *message.Message) {
 		fmt.Printf("Received message on subject %s (%d bytes)\n", msg.Subject.String(), len(msg.Data))

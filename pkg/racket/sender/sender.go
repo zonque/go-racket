@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/holoplot/go-racket/pkg/multicast"
+	"github.com/holoplot/go-racket/pkg/racket/global"
 	"github.com/holoplot/go-racket/pkg/racket/message"
+	multicastpool "github.com/holoplot/go-racket/pkg/racket/multicast-pool"
 	"github.com/holoplot/go-racket/pkg/racket/stream"
 	"golang.org/x/net/ipv4"
 )
@@ -17,7 +19,7 @@ type Sender struct {
 	lock sync.RWMutex
 
 	ifis          []*net.Interface
-	pool          *MulticastPool
+	pool          *multicastpool.Pool
 	senderStreams map[stream.Stream]*senderStream
 }
 
@@ -29,12 +31,12 @@ type queuedMessage struct {
 type senderStream struct {
 	lock     sync.RWMutex
 	sendLock sync.Mutex
-	pool     *MulticastPool
+	pool     *multicastpool.Pool
 	pcs      []*ipv4.PacketConn
 	messages map[string]*queuedMessage
 }
 
-func newSenderStream(ifis []*net.Interface, pool *MulticastPool) (*senderStream, error) {
+func newSenderStream(ifis []*net.Interface, pool *multicastpool.Pool) (*senderStream, error) {
 	sg := &senderStream{
 		pool:     pool,
 		pcs:      make([]*ipv4.PacketConn, 0),
@@ -58,7 +60,7 @@ func (sg *senderStream) reopenPacketConns(ifis []*net.Interface) error {
 		}
 	}
 
-	pcs, err := multicast.OpenPacketConns(ifis, defaultPort)
+	pcs, err := multicast.OpenPacketConns(ifis, global.DefaultPort)
 	if err != nil {
 		return err
 	}
@@ -141,7 +143,7 @@ func (sg *senderStream) flush() {
 	sg.messages = make(map[string]*queuedMessage)
 }
 
-func NewSender(ifis []*net.Interface, pool *MulticastPool) (*Sender, error) {
+func New(ifis []*net.Interface, pool *multicastpool.Pool) (*Sender, error) {
 	sender := &Sender{
 		senderStreams: make(map[stream.Stream]*senderStream),
 		ifis:          ifis,
