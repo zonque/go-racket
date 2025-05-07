@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
-	"github.com/holoplot/go-rotor/pkg/rotor/group"
 	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/stream"
 	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 )
 
@@ -43,12 +43,15 @@ func main() {
 
 	ifis := []*net.Interface{lo, eth}
 
-	sender := rotor.NewSender(ifis, multicastPool)
+	sender, err := rotor.NewSender(ifis, multicastPool)
+	if err != nil {
+		panic(err)
+	}
 
 	n := 0
 
-	for groupIndex := range 256 {
-		g := group.Group(fmt.Sprintf("group-%d", groupIndex))
+	for streamIndex := range 256 {
+		g := stream.Stream(fmt.Sprintf("stream-%d", streamIndex))
 
 		for subjectIndex := range 1024 {
 			s := subject.Subject{
@@ -56,7 +59,7 @@ func main() {
 			}
 
 			msg := &message.Message{
-				Group:    g,
+				Stream:   g,
 				Subject:  s,
 				Data:     randomBytes(128),
 				Interval: time.Millisecond*time.Duration(rand.IntN(1000)) + time.Second,

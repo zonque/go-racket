@@ -1,8 +1,7 @@
 package subscription
 
 import (
-	"crypto/sha512"
-	"fmt"
+	"crypto/sha256"
 	"sync"
 
 	"github.com/holoplot/go-rotor/pkg/rotor/message"
@@ -51,8 +50,12 @@ func (sn *node) removeSubscription(sub *Subscription) {
 		}
 	}
 
-	for _, child := range sn.children {
+	for name, child := range sn.children {
 		child.removeSubscription(sub)
+
+		if len(child.subscriptions) == 0 && len(child.children) == 0 {
+			delete(sn.children, name)
+		}
 	}
 }
 
@@ -61,13 +64,13 @@ type Tree struct {
 	root  *node
 }
 
-func (t *Tree) Add(subject subject.Subject, callback Callback, opts ...Opt) *Subscription {
+func (t *Tree) Add(s subject.Subject, callback Callback, opts ...Opt) *Subscription {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	node := t.root
-	for _, part := range subject.Parts {
-		if part == "*" {
+	for _, part := range s.Parts {
+		if part == subject.Wildcard {
 			break
 		}
 
@@ -108,19 +111,19 @@ func (t *Tree) Dispatch(msg *message.Message) {
 	node := t.root
 	for _, part := range msg.Subject.Parts {
 		for _, sub := range node.subscriptions {
-			if len(hash) == 0 {
-				h := sha512.New()
-				h.Write([]byte(msg.Data))
-				hash = string(h.Sum(nil))
+			if sub.onlyOnChange {
+				if len(hash) == 0 {
+					h := sha256.New()
+					h.Write([]byte(msg.Data))
+					hash = string(h.Sum(nil))
+				}
+
+				if sub.contentHash[msg.Subject.String()] == hash {
+					continue
+				}
+
+				sub.contentHash[msg.Subject.String()] = hash
 			}
-
-			if sub.onlyOnChange && sub.contentHash[msg.Subject.String()] == hash {
-				continue
-			}
-
-			// fmt.Printf("Subject: %s, Hash: %s, OnlyOnChange %t\n", msg.Subject.String(), hash, sub.onlyOnChange)
-
-			sub.contentHash[msg.Subject.String()] = hash
 
 			sub.cb(msg)
 		}
@@ -131,32 +134,6 @@ func (t *Tree) Dispatch(msg *message.Message) {
 			return
 		}
 	}
-}
-
-func (st *Tree) Dump() string {
-	st.mutex.Lock()
-	defer st.mutex.Unlock()
-
-	var dump string
-	var dumpNode func(node *node, level int)
-
-	dumpNode = func(node *node, level int) {
-		prefix := make([]byte, level)
-		for i := range prefix {
-			prefix[i] = ' '
-		}
-
-		dump += string(prefix) + fmt.Sprintf("%d Subscription\n", len(node.subscriptions))
-
-		for part, child := range node.children {
-			dump += string(prefix) + part + "\n"
-			dumpNode(child, level+4)
-		}
-	}
-
-	dumpNode(st.root, 0)
-
-	return dump
 }
 
 func NewTree() *Tree {

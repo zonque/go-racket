@@ -28,7 +28,10 @@ func main() {
 		Parts: []string{"org", "holoplot", "go", "rotor", "demo"},
 	}
 
-	sender := rotor.NewSender(ifis, multicastPool)
+	sender, err := rotor.NewSender(ifis, multicastPool)
+	if err != nil {
+		panic(err)
+	}
 
 	msg := &message.Message{
 		Subject:  s,

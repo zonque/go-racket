@@ -6,8 +6,8 @@ import (
 	"net"
 
 	"github.com/holoplot/go-rotor/pkg/rotor"
-	"github.com/holoplot/go-rotor/pkg/rotor/group"
 	"github.com/holoplot/go-rotor/pkg/rotor/message"
+	"github.com/holoplot/go-rotor/pkg/rotor/stream"
 	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 	"github.com/holoplot/go-rotor/pkg/rotor/subscription"
 )
@@ -20,7 +20,7 @@ func main() {
 
 	multicastPool := rotor.NewMulticastPool(base)
 
-	g1 := group.Group("group-1")
+	g1 := stream.Stream("stream-1")
 
 	s1 := subject.Subject{
 		Parts: []string{"org", "holoplot", "*"},

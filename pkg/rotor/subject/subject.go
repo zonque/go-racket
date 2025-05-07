@@ -5,20 +5,24 @@ import (
 	"strings"
 )
 
+const (
+	Separator = "."
+	Wildcard  = "*"
+)
+
 type Subject struct {
 	Parts []string
 }
 
 var (
-	ErrMultipleWildcards = errors.New("multiple wildcards in subject")
-	ErrWildcardNotLast   = errors.New("wildcard not at the end of subject")
+	ErrWildcardNotLast = errors.New("wildcard not at the end of subject")
 )
 
 func Parse(subject string) (Subject, error) {
-	parts := strings.Split(subject, ".")
+	parts := strings.Split(subject, Separator)
 
 	for i, part := range parts {
-		if part == "*" {
+		if part == Wildcard {
 			if i != len(parts)-1 {
 				return Subject{}, ErrWildcardNotLast
 			}
@@ -31,9 +35,9 @@ func Parse(subject string) (Subject, error) {
 }
 
 func (s Subject) HasWildcard() bool {
-	return s.Parts[len(s.Parts)-1] == "*"
+	return s.Parts[len(s.Parts)-1] == Wildcard
 }
 
 func (s Subject) String() string {
-	return strings.Join(s.Parts, ".")
+	return strings.Join(s.Parts, Separator)
 }

@@ -21,7 +21,7 @@ type listener struct {
 	ipv4PacketConn *ipv4.PacketConn
 	ifis           []*net.Interface
 
-	groups map[string]consumers
+	streams map[string]consumers
 }
 
 func (l *listener) close() {
@@ -36,8 +36,8 @@ func (l *listener) addConsumer(c *Consumer) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	if _, ok := l.groups[k]; !ok {
-		l.groups[k] = make(consumers, 0)
+	if _, ok := l.streams[k]; !ok {
+		l.streams[k] = make(consumers, 0)
 
 		for _, ifi := range l.ifis {
 			if err := l.ipv4PacketConn.JoinGroup(ifi, c.addr); err != nil {
@@ -46,7 +46,7 @@ func (l *listener) addConsumer(c *Consumer) error {
 		}
 	}
 
-	l.groups[k] = append(l.groups[k], c)
+	l.streams[k] = append(l.streams[k], c)
 
 	log.Info().Str("addr", c.addr.String()).Msg("added consumer")
 
@@ -59,21 +59,21 @@ func (l *listener) removeConsumer(c *Consumer) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	cs, ok := l.groups[k]
+	cs, ok := l.streams[k]
 	if !ok {
 		return
 	}
 
 	for i, cc := range cs {
 		if cc == c {
-			l.groups[k] = slices.Delete(cs, i, i+1)
+			l.streams[k] = slices.Delete(cs, i, i+1)
 
 			break
 		}
 	}
 
-	if len(l.groups[k]) == 0 {
-		delete(l.groups, k)
+	if len(l.streams[k]) == 0 {
+		delete(l.streams, k)
 
 		for _, ifi := range l.ifis {
 			if err := l.ipv4PacketConn.LeaveGroup(ifi, c.addr); err != nil {
@@ -87,7 +87,7 @@ func (l *listener) hasConsumers() bool {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	return len(l.groups) > 0
+	return len(l.streams) > 0
 }
 
 func newListener(port int, ifis []*net.Interface) (*listener, error) {
@@ -102,7 +102,7 @@ func newListener(port int, ifis []*net.Interface) (*listener, error) {
 
 	l := &listener{
 		ipv4PacketConn: pc,
-		groups:         make(map[string]consumers),
+		streams:        make(map[string]consumers),
 		ifis:           ifis,
 	}
 
@@ -123,7 +123,7 @@ func newListener(port int, ifis []*net.Interface) (*listener, error) {
 
 			l.mutex.Lock()
 
-			if cs, ok := l.groups[k]; ok {
+			if cs, ok := l.streams[k]; ok {
 				for _, c := range cs {
 					newBuf := make([]byte, n)
 					copy(newBuf, buf[:n])

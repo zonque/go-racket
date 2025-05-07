@@ -1,6 +1,7 @@
 package multicast
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -12,20 +13,24 @@ import (
 func OpenPacketConn(bindAddr net.IP, port int, ifname string) (*ipv4.PacketConn, error) {
 	s, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_UDP)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("socket syscall failed: %w", err)
 	}
 
 	if err := syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to set SO_REUSEADDR: %w", err)
 	}
 
-	// syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+	// if err := syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1); err != nil {
+	// 	return nil, fmt.Errorf("failed to set SO_REUSEPORT: %w", err)
+	// }
+
 	// if err := syscall.SetsockoptString(s, syscall.SOL_SOCKET, syscall.SO_BINDTODEVICE, ifname); err != nil {
 	// 	log.Fatal(err)
 	// }
 
 	lsa := syscall.SockaddrInet4{Port: port}
 	copy(lsa.Addr[:], bindAddr.To4())
+	// copy(lsa.Addr[:], []byte{0, 0, 0, 0})
 
 	if err := syscall.Bind(s, &lsa); err != nil {
 		syscall.Close(s)
@@ -40,9 +45,7 @@ func OpenPacketConn(bindAddr net.IP, port int, ifname string) (*ipv4.PacketConn,
 		log.Fatal(err)
 	}
 
-	p := ipv4.NewPacketConn(c)
-
-	return p, nil
+	return ipv4.NewPacketConn(c), nil
 }
 
 func OpenPacketConns(ifis []*net.Interface, port int) ([]*ipv4.PacketConn, error) {

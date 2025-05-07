@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"net"
 
-	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/stream"
 )
 
 const (
@@ -21,8 +21,8 @@ func NewMulticastPool(base net.IPNet) *MulticastPool {
 	}
 }
 
-func (m *MulticastPool) AddressForGroup(group group.Group) *net.UDPAddr {
-	h := sha256.Sum256([]byte(group))
+func (m *MulticastPool) AddressForStream(stream stream.Stream) *net.UDPAddr {
+	h := sha256.Sum256([]byte(stream))
 
 	a := [4]byte{m.base.IP[12], m.base.IP[13], m.base.IP[14], m.base.IP[15]}
 

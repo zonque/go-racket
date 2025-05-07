@@ -7,27 +7,27 @@ import (
 	"net"
 	"time"
 
-	"github.com/holoplot/go-rotor/pkg/rotor/group"
+	"github.com/holoplot/go-rotor/pkg/rotor/stream"
 	"github.com/holoplot/go-rotor/pkg/rotor/subject"
 	"golang.org/x/net/ipv4"
 )
 
 var (
-	ErrGroupEmpty           = fmt.Errorf("group is empty")
+	ErrStreamEmpty          = fmt.Errorf("stream is empty")
 	ErrSubjectEmpty         = fmt.Errorf("subject is empty")
 	ErrInvalidMessageFormat = fmt.Errorf("invalid message format")
 )
 
 type Message struct {
-	Group    group.Group
+	Stream   stream.Stream
 	Subject  subject.Subject
 	Data     []byte
 	Interval time.Duration
 }
 
 func (m *Message) Validate() error {
-	if m.Group == "" {
-		return ErrGroupEmpty
+	if m.Stream == "" {
+		return ErrStreamEmpty
 	}
 
 	if len(m.Subject.Parts) == 0 {
@@ -43,7 +43,7 @@ func Parse(payload []byte) (*Message, error) {
 		return nil, fmt.Errorf("invalid message format")
 	}
 
-	group := group.Group(parts[0])
+	stream := stream.Stream(parts[0])
 
 	subject, err := subject.Parse(string(parts[1]))
 	if err != nil {
@@ -57,7 +57,7 @@ func Parse(payload []byte) (*Message, error) {
 	data := parts[2]
 
 	return &Message{
-		Group:    group,
+		Stream:   stream,
 		Subject:  subject,
 		Data:     data,
 		Interval: time.Second,
@@ -66,7 +66,7 @@ func Parse(payload []byte) (*Message, error) {
 
 func (m *Message) Send(conn *ipv4.PacketConn, addr net.Addr) error {
 	p := [][]byte{
-		[]byte(m.Group + "\\0"),
+		[]byte(m.Stream + "\\0"),
 		[]byte(m.Subject.String() + "\\0"),
 		m.Data,
 	}
